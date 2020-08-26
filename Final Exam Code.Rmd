@@ -1,0 +1,283 @@
+---
+title: "Final Exam"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("~/Desktop/Survival Analysis /datasets")
+dat<-read.csv("breastfeed.csv")
+library(survival)
+library(psych)
+library(survminer)
+library(ggplot2)
+attach(dat)
+```
+
+  The analysis is aimed to study what factors are related to the duration of breastfeeding. 
+
+# Method 
+  In order to understand the the dataset, descriptive statistics is needed to gain understanding of the distributions. 
+  
+## Descriptive by Covariate 
+
+### Race
+```{r}
+# Proportion 
+table(race)/nrow(dat)
+# Survival Distribution 
+km.race<-survfit(Surv(length,complete)~as.factor(race))
+ggsurvplot(km.race,data=dat,conf.int = F,risk.table.col="strata",ggtheme=theme_bw(),title="Race",legend.title="Race",legend.labs=c("White","Black","Other"))
+```
+
+  The dataset contains 3 race categories: white, blackc and others. Among all subjects, 71.4% of them are White, 12.6% of them are black, and 16% of them are in other races. Kaplan-Meier Estimator was conducted. According to the plot, all races had similar breastfeeding probability However, as time goes by, white had longer breasfeeding length compared to other races. 
+
+
+### Poverty
+```{r}
+# Proportion 
+table(poverty)/nrow(dat)
+# Survival Distribution 
+km.pov<-survfit(Surv(length,complete)~poverty)
+ggsurvplot(km.pov,data=dat,conf.int = F,risk.table.col="strata",ggtheme=theme_bw(),title="Poverty",legend.title="Poverty",legend.labs=c("Not Live in Poverty","In Poverty"))
+```
+
+  Among all subjects, 82.5% of the mothers live in poverty, and 18.4% of them are not. According to the Kaplan Meier survival plot, mothers from both group had similar breastfeeding probabilities; however, more affulent mothers had longer breastfeeding length than poor mothers.
+
+### Smoke
+```{r}
+# Proportion 
+table(dat$smoke)/nrow(dat)
+# Survival Distribution 
+km.smoke<-survfit(Surv(length,complete)~smoke,dat)
+ggsurvplot(km.smoke,data=dat,conf.int = F,risk.table.col="strata",ggtheme=theme_bw(),,title="Smoke",legend.title="Smoke",legend.labs=c("Not Smoke","Smoke"))
+
+```
+
+  Among all subjects, 70.9% of the mothers do not smoke, and 29.1% of them smoke. According to the Kaplan Meier survival plot, mothers from both group had similar breastfeeding probabilities at the beginning; however, non-smoking mothers had higher breastfeeding probabilities and longer breastfeeding length. 
+
+### Alcohol
+```{r}
+# Proportion 
+table(alcohol)/nrow(dat)
+# Survival Distribution 
+km.alo<-survfit(Surv(length,complete)~alcohol)
+ggsurvplot(km.alo,data=dat,conf.int = F,risk.table.col="strata",ggtheme=theme_bw(),title="Alcohol",legend.title="Alcohol",legend.labs=c("No Alcohol","Alcohol"))
+```
+
+  Among all subjects, 91.4% of the mothers did not have alcohol, and 8.5% of them had alcohol. According to the Kaplan Meier survival plot, mothers from both group had similar breastfeeding probabilities; however, sober mothers had longer breastfeeding length and higher breastfeeding probability as time passes.
+
+### Prental care
+```{r}
+# Proportion 
+table(prenatal3)/nrow(dat)
+# Survival Distribution 
+km.pre<-survfit(Surv(length,complete)~prenatal3)
+ggsurvplot(km.pre,data=dat,conf.int = F,risk.table.col="strata",ggtheme=theme_bw(),title="Parenatal Care",legend.title="Parenatal Care",legend.labs=c("No Care","Have Care"))
+```
+
+  Among all subjects, 82.3% of the mothers did not seek or never saught prenatal care after third month of pregnancy, and only 17.7% of them did. According to the Kaplan Meier survival plot, mothers from both group had similar breastfeeding probabilities. Differ from previous covariates, they did not have very obvious different breastfeeding probabilities, yet, mothers without prenatal care had longer breastfeeding time length. 
+
+### Continuous Covariate Distribution 
+```{r}
+## age
+summary(age)
+table(age)
+
+## birth year 
+summary(birthyr)
+table(birthyr)
+
+## education 
+summary(educ)
+table(educ)
+
+## plot
+par(mfrow=c(1,3))
+hist(age,main = "Age")
+hist(birthyr,main = "Birth Year")
+hist(educ,main="Years of Education")
+```
+
+  Among all mothers participated in this study, their average age is 21 years old and most of them are or below 23 years old, with youngest mothers at 15 years old and oldest mothers age 28. Most of them were born in the 80s, between 1981 to 1985. They had 12 years of education on average and mostly, with least years of education at 3 years and longest at 19 years of education.
+
+  The above descriptive analysis helped me to gain basic knowledge of the sample. These subjects are young moms with 12 years of education on average. Majority of them are white, did not drink alcohol or smoke at time of birth, and did not live in poverty. 
+
+## Dummy Variables
+Since birth year is continuous numerical variables, its values will influence the outcome greatly. Therefore, it is better to change it to categorical binary variables, and this transformation is easier for later model selection and building. I think Age and years of education are better to stay as continuous numerical variables, as the indicator is one more year or one additional year of education relative to breastfeeding hazard ratio.
+
+```{r}
+## age 
+dat$below20<-ifelse(age<20,1,0)
+dat$mid20s<-ifelse(age>=20&age<25,1,0)
+dat$late20s<-ifelse(age>=25,1,0)
+  
+## Birth Year Categories
+## subjects born before the 80s, 1 if yes, 0 if not
+dat$before80<-ifelse(birthyr<80, 1, 0)
+## subjects born after the 80s, 1 if yes, 0 if not
+dat$in80s<-ifelse(birthyr>=80 , 1, 0)
+
+## race categories
+dat$white<-ifelse(race==1,1,0)
+## black
+dat$black<-ifelse(race==2,1,0)
+## other
+dat$other<-ifelse(race==3,1,0)
+```
+
+### Confidence Interval 
+```{r}
+greenwood<-survfit(Surv(length,complete)~1,dat,conf.type="plain")
+loglog<-survfit(Surv(length,complete)~1,data=dat,conf.type="log-log")
+km<-survfit(Surv(length,complete)~1,data=dat)
+summary(loglog)
+plot(greenwood, col = "red",main="KM Confidence Interval of Breastfeeding Duration")
+lines(loglog,col="blue",lty=2)
+legend(145,0.9,legend=c("greenwood","log-log"),col = c("red","blue"),lty=1:2)
+```
+
+## Cox Proportional Hazards
+### Step 1 
+```{r}
+## All the covariates 
+covariates<-c("white","black","other","poverty","smoke","alcohol","prenatal3","below20","mid20s","late20s","before80","in80s","educ")
+
+null<-coxph(Surv(length,complete)~1,ties = "breslow")
+logLik(null)*(-2)-1.643
+
+## the survival function 
+uni.formulas<-sapply(covariates,
+                     function(x) as.formula(paste('Surv(length,complete)~',x)))
+
+## fit univariate cox ph models one by one 
+uni.models<-lapply(uni.formulas, function(x){coxph(x,data=dat,ties = "breslow")})
+
+## extract data 
+results<-lapply(uni.models, function(x){
+  x<-summary(x)
+  p.value<-signif(x$wald["pvalue"],digits = 3) #p-values
+  beta<-signif(x$coef[1],digits = 3) #coefficients
+  HR<-round(x$coef[2],digits = 3)# hazard ratios, exp(beta)
+  neg.twologL<-round(x$loglik[2]*(-2),3)
+  table1<-c(beta,HR,p.value,neg.twologL)
+  names(table1)<-c("beta","HR","p.value","neg.2LogL")
+  return(table1)
+})
+
+## show the result table
+as.table(t(as.data.frame(results)))
+
+```
+Based on the Cox Proportional Hazards models, different race and birth year have varying influence on breastfeeding completion probability. For example, white mothers are 0.841 times the hazard ratio for completing breastfeeding than non-white mothers, holding other covariates constant. On the other hand, other race mothers are 1.255 times the hazard for completing breastfeeding,holding other covariates constant. None of the birth year group is significant.The hazard ratio for smoking mothers is 1.245 times than non-smoking mothers,holding other covariates constant; and mothers who consume alcohol are 1.173 times the hazard ratio than non-drinking mothers. 
+Using Collett's model selction methods, the first step is to fit a univariate model for each covariate, and identify the predictors significant at level p=0.20.From above result table, white,other race,smoke,alcohol,and eudc have p.values less than 0.2. Therefore, these covariates are included for multivariate model. 
+
+### Step 2
+Fit a multivariate model with all significant univariate predictors, and use backward selection to eliminate non-significant variables at level p2=0.10.
+```{r}
+multi.model1<-coxph(Surv(length,complete)~white+other+smoke+alcohol+educ,dat)
+summary(multi.model1)
+(-2)*logLik(multi.model1) ## 10358.46
+## smoke has p.value less than 0.1 
+## backwards selection, 
+
+cox.smoke<-coxph(Surv(length,complete)~smoke,dat)
+p.smoke<-summary(cox.smoke)$coefficients[1,5]
+neg2.LL.smoke<-(-2)*cox.smoke$loglik[2]
+```
+
+
+### Step 3 
+Starting with final step 2 model, consider each of the non-significant variables from step 1 using forward selection, with significance level p3= 0.10.
+```{r}
+# black
+cox.black<-coxph(Surv(length,complete)~smoke+black,dat)
+p.black<-summary(cox.black)$coefficients[2,5]
+neg2.LL.black<-(-2)*cox.black$loglik[2]
+# poverty
+cox.pov<-coxph(Surv(length,complete)~smoke+poverty,dat)
+p.pov<-summary(cox.pov)$coefficients[2,5]
+neg2.LL.pov<-(-2)*cox.pov$loglik[2]
+
+# prental3
+cox.prenatal<-coxph(Surv(length,complete)~smoke+prenatal3,dat)
+p.prenatal<-summary(cox.prenatal)$coefficients[2,5]
+neg2.LL.prenatal<-(-2)*cox.prenatal$loglik[2]
+
+## age
+cox.below20<-coxph(Surv(length,complete)~smoke+below20,dat)
+p.below20<-summary(cox.below20)$coefficients[2,5]
+neg2.LL.below20<-(-2)*cox.below20$loglik[2]
+
+cox.mid20s<-coxph(Surv(length,complete)~smoke+mid20s,dat)
+p.mid20s<-summary(cox.mid20s)$coefficients[2,5]
+neg2.LL.mid20s<-(-2)*cox.mid20s$loglik[2]
+
+cox.late20s<-coxph(Surv(length,complete)~smoke+late20s,dat)
+p.late20s<-summary(cox.late20s)$coefficients[2,5]
+neg2.LL.late20s<-(-2)*cox.late20s$loglik[2]
+
+#before80s
+cox.before80<-coxph(Surv(length,complete)~smoke+before80,dat)
+p.before80<-summary(cox.before80)$coefficients[2,5]
+neg2.LL.before80<-(-2)*cox.before80$loglik[2]
+
+ #in80s
+cox.in80s<-coxph(Surv(length,complete)~smoke+in80s,dat)
+p.in80s<-summary(cox.in80s)$coefficients[2,5]
+neg2.LL.in80s<-(-2)*cox.in80s$loglik[2]
+
+
+p.value<-c(p.smoke,p.black,p.pov,p.prenatal,p.before80,p.in80s,p.below20,p.mid20s,p.late20s)
+Neg2LogLike<-c(neg2.LL.smoke,neg2.LL.black,neg2.LL.pov,neg2.LL.prenatal,neg2.LL.before80,neg2.LL.in80s,neg2.LL.below20,neg2.LL.mid20s,neg2.LL.late20s)
+names(p.value)<-c("Smoke","Smoke+Black","Smoke+Poverty","Smoke+Prenatal Care","Smoke+Born before 80s","Smoke+Born in the 80s","Smoke+Below20s","Smoke+Mid20s","Smoke+late20s")
+
+data.frame(Neg2LogLike,p.value)
+
+```
+After considering non-significant covariate from Step 1 using forward selection, covariate white has p-value less than 0.1. 
+
+
+```{r}
+FINAL<-coxph(Surv(length,complete)~smoke,dat)
+AIC(FINAL)
+FINAL$loglik[2]*-(2)
+summary(FINAL)
+```
+## Extra Credit
+### Assessing PH assumption 
+```{r}
+ggsurvplot(km.smoke,fun = "cloglog",data=dat)
+## lines are not parallel-- proportional hazards assumption is violated as the log-log survival curves are not parallel.
+```
+
+### Event Size:
+80% power to detect the observed hazard ratio for mothers who smoke versus mothers who do not smoke, with a two-sided significance level of 0.05 
+```{r}
+alpha<-0.05
+z<-1.96
+beta<-0.2
+z.beta<-qnorm(0.8)
+HR<-1.255
+## required number of events 
+D=4*((1.96+z.beta)^2)/((log(HR))^2)
+D
+```
+### AIC Backward Selection 
+
+```{r}
+library(MASS)
+Full<-coxph(Surv(length,complete)~white+black+other+poverty+smoke+alcohol+prenatal3+before80+in80s+below20+mid20s+late20s+educ,dat)
+FINAL2<-stepAIC(Full,direction = "backward",trace = F)
+summary(FINAL2)
+```
+
+
+
+
+
+
+
